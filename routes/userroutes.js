@@ -4,23 +4,20 @@ const { sendEmail } = require("../config/emailConfig");
 
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const router = express.Router(); // Method for routing
+const router = express.Router(); 
 function generateOTP() {
-    const otp = crypto.randomInt(100000, 999999); // generates a six-digit random number
+    const otp = crypto.randomInt(100000, 999999); 
     return otp.toString();
 }
-
-// Create a router for POST
+const otp = generateOTP();
 router.post("/users", async (req, res) => {
     try {
         const { name, email, password, dob, phone } = req.body;
-        
-        // Check if all fields are filled
+
         if (!name || !email || !password || !dob || !phone) {
             return res.status(400).json({ message: "Sabhi fields required hain" });
         }
-        
-        // Check if user already exists
+
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: "User already exists" });
@@ -28,11 +25,11 @@ router.post("/users", async (req, res) => {
         }
         const otp = generateOTP();
         console.log(otp);
-        
-        const otpToken=jwt.sign({email,otp},
-            process.env.JWT_SECRET,{expiresIn:"10m"});
-            console.log(otpToken);
-          await sendEmail(email,otp);
+
+        const otpToken = jwt.sign({ email, otp },
+            process.env.JWT_SECRET, { expiresIn: "10m" });
+        console.log(otpToken);
+        await sendEmail(email, otp);
 
         // Create a new user
         const newUser = new User({ name, email, password, dob, phone });
@@ -55,28 +52,33 @@ router.post("/users", async (req, res) => {
 
         const emailResult = await sendEmail(mailOptions);
 
-        res.status(200).json({ 
+        res.status(200).json({
             message: "User created successfully and email sent successfully", emailResult,
-            token 
+            token
         });
 
     } catch (error) {
         res.status(500).json({ message: "Error creating User", error });
     }
 });
-router.post('/users/verify-otp',async(req,res)=>{
-    const{token,userOtp}=req.body;
+router.post('/users/verify-otp', async (req, res) => {
+    const { token, userOtp } = req.body;
     try {
-         const decoded = jwt.verify(token,process.env.JWT_SECRET);
-         if(decoded.otp=== userOtp){
-            // ye line tab add karni hai jab aap ye chahte hai ki jab tak otp verify na ho tab tak login route access na ho 
-            await User.updateOne({ email: decoded.email }, { isEmailVerified: true });
-            res.status(200).json({message:"OTP Verified Successfully"});
-         }else{
-            res.status(400).json({message:"Invalid OTP , please try again."})
-         }
+        const decoded = jwt.verify(token, process.env.JWT_SECRET);
+        if (!decoded || decoded.otp == userOtp) {
+            return res.status(400).json({ message: "Invalid OTP" });
+
+
+        }
+        const email = decoded.email;
+        const user = await User.findOne({ email });
+        user.isEmailVerified = true;
+        await user.save();
+        return res.status(200).json({ message: "Email verified successfully",user });
+
+        
     } catch (error) {
-        return res.status(500).json({message:"Otp verification Failed or Otp has expired"})
+        return res.status(500).json({ message: "Otp verification Failed or Otp has expired" ,error});
     }
 })
 router.post("/users/login", async (req, res) => {
@@ -94,7 +96,7 @@ router.post("/users/login", async (req, res) => {
             return res.status(400).json({ message: "Invalid email or password" });
         }
         const token = jwt.sign(
-            {id: user._id,email: user.email },
+            { id: user._id, email: user.email },
             process.env.JWT_SECRET,
             { expiresIn: '1h' }
         );
@@ -103,7 +105,7 @@ router.post("/users/login", async (req, res) => {
 
     } catch (error) {
         console.error("Login failed:", error.message);
-        res.status(500).json({ message: "Login failed", error:message });
+        res.status(500).json({ message: "Login failed", error: message });
     }
 });
 // Create a router for GET all users
