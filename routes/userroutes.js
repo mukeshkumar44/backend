@@ -9,17 +9,30 @@ const router = express.Router(); // Method for routing
 router.post("/users", async (req, res) => {
     try {
         const { name, email, password, dob, phone } = req.body;
+        
+        // Check if all fields are filled
         if (!name || !email || !password || !dob || !phone) {
             return res.status(400).json({ message: "Sabhi fields required hain" });
         }
+        
+        // Check if user already exists
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: "User already exists" });
         }
 
+        // Create a new user
         const newUser = new User({ name, email, password, dob, phone });
         await newUser.save();
 
+        // Generate JWT Token
+        const token = jwt.sign(
+            { userId: newUser._id },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
+
+        // Email Options
         const mailOptions = {
             from: process.env.EMAIL,
             to: email,
@@ -28,7 +41,11 @@ router.post("/users", async (req, res) => {
         };
 
         const emailResult = await sendEmail(mailOptions);
-        res.status(200).json({ message: "User created successfully and email sent successfully", user: emailResult });
+
+        res.status(200).json({ 
+            message: "User created successfully and email sent successfully", 
+            token 
+        });
 
     } catch (error) {
         res.status(500).json({ message: "Error creating User", error });
