@@ -58,7 +58,7 @@ router.post("/users", async (req, res) => {
         res.status(500).json({ message: "Error creating User", error });
     }
 });
-router.post("/verify-otp", async (req, res) => {
+router.post("/users/verify-otp", async (req, res) => {
     try {
         const { email, otp } = req.body;
 
