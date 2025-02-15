@@ -1,6 +1,8 @@
 const express = require("express");
 const User = require("../models/user");
 const { sendEmail } = require("../config/emailConfig");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
 const router = express.Router(); // Method for routing
 
 // Create a router for POST
@@ -32,7 +34,33 @@ router.post("/users", async (req, res) => {
         res.status(500).json({ message: "Error creating User", error });
     }
 });
+router.post("/users/login", async (req, res) => {
+    try {
+        const { email, password } = req.body;
 
+        // Check required fields
+        if (!email || !password) {
+            return res.status(400).json({ message: "Email and password are required!" });
+        }
+
+        // Check if user exists
+        const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(400).json({ message: "Invalid email or password" });
+        }
+        const token = jwt.sign(
+            {id: user._id,email: user.email },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
+
+        res.status(200).json({ message: "Login successful!", token });
+
+    } catch (error) {
+        console.error("Login failed:", error.message);
+        res.status(500).json({ message: "Login failed", error:message });
+    }
+});
 // Create a router for GET all users
 router.get("/users", async (req, res) => {
     try {

@@ -4,7 +4,7 @@ const connectDB = require("./config/db");
 require("dotenv").config(); 
 const routes=require("./routes/userroutes");
 const sellerroutes=require("./routes/sellerroutes");
-// const productroutes=require("./routes/productroutes");
+const productroutes=require("./routes/productroutes");
 const orderroutes=require("./routes/orderroutes");
 const loginroutes=require("./routes/loginroutes");
 
@@ -22,8 +22,8 @@ app.get("/", (req, res) => {
 app.use("/api",routes,);
 app.use("/api",sellerroutes,);
 app.use("/api",orderroutes,);
-app.use("/api",loginroutes,);
-// app.use("/api",productroutes,);
-app.listen(5000, () => {
+// app.use("/api",loginroutes,);
+app.use("/api",productroutes,);
+app.listen(9001, () => {
     console.log("Server started on port 5000");
 })

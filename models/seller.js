@@ -5,7 +5,9 @@ const SellerSchema = new mongoose.Schema({
     password:{type:String,required:true,unique:true},
     contact:{type:String,required:true,unique:true},
     storename:{type:String,required:true,unique:true},
-    address:{type:String,required:true,unique:true}
+    address:{type:String,required:true,unique:true},
+    isEmailVerified:{type:Boolean,default:false, enum:[true,false]},
+    role:{type:String,default:"seller",enum:["seller","admin","user"]},
 })
 
 module.exports=mongoose.model("Seller",SellerSchema);
