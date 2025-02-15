@@ -4,59 +4,13 @@ const { sendEmail } = require("../config/emailConfig");
 
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const { generateOTP, sendEmail2 } = require('../utils/sendEmail');
 const router = express.Router(); // Method for routing
+function generateOTP() {
+    const otp = crypto.randomInt(100000, 999999); // generates a six-digit random number
+    return otp.toString();
+}
 
 // Create a router for POST
-// router.post("/users", async (req, res) => {
-//     try {
-//         const { name, email, password, dob, phone } = req.body;
-        
-//         // Check if all fields are filled
-//         if (!name || !email || !password || !dob || !phone) {
-//             return res.status(400).json({ message: "Sabhi fields required hain" });
-//         }
-       
-        
-//         // Check if user already exists
-//         const existingUser = await User.findOne({ email });
-//         if (existingUser) {
-//             return res.status(400).json({ message: "User already exists" });
-
-//         }
-        
-        
-
-//         // Create a new user
-//         const newUser = new User({ name, email, password, dob, phone });
-//         await newUser.save();
-
-//         // Generate JWT Token
-//         const token = jwt.sign(
-//             { userId: newUser._id },
-//             process.env.JWT_SECRET,
-//             { expiresIn: '1h' }
-//         );
-
-//         // Email Options
-//         const mailOptions = {
-//             from: process.env.EMAIL,
-//             to: email,
-//             subject: "Welcome to our e-commerce website",
-//             text: `Hello ${name}, thank you for registering in our app. Welcome to our platform. Hope you will like our services.`,
-//         };
-
-//         const emailResult = await sendEmail(mailOptions);
-
-//         res.status(200).json({ 
-//             message: "User created successfully and email sent successfully", 
-//             token 
-//         });
-
-//     } catch (error) {
-//         res.status(500).json({ message: "Error creating User", error });
-//     }
-// });
 router.post("/users", async (req, res) => {
     try {
         const { name, email, password, dob, phone } = req.body;
@@ -70,85 +24,61 @@ router.post("/users", async (req, res) => {
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: "User already exists" });
-        }
 
-        // Create User
-        const newUser = new User({ 
-            name, 
-            email, 
-            password, 
-            dob, 
-            phone 
-        });
+        }
+        const otp = generateOTP();
+        console.log(otp);
+        
+        const otpToken=jwt.sign({email,otp},
+            process.env.JWT_SECRET,{expiresIn:"10m"});
+            console.log(otpToken);
+          await sendEmail(email,otp);
+
+        // Create a new user
+        const newUser = new User({ name, email, password, dob, phone });
         await newUser.save();
 
-        // Generate OTP
-        const otp = generateOTP();
-        const otpExpiry = Date.now() + (10 * 60 * 1000); // 10 minutes expiry
+        // Generate JWT Token
+        const token = jwt.sign(
+            { userId: newUser._id },
+            process.env.JWT_SECRET,
+            { expiresIn: '1h' }
+        );
 
-        // Save OTP in Otp Collection
-        const newOtp = new Otp({ email, otp, otpExpiry });
-        await newOtp.save();
+        // Email Options
+        const mailOptions = {
+            from: process.env.EMAIL,
+            to: email,
+            subject: "Welcome to our e-commerce website",
+            text: `Hello ${name}, thank you for registering in our app. Welcome to our platform. Hope you will like our services.`,
+        };
 
-        // Send OTP via Email using sendEmail2
-        const emailResult = await sendEmail2(email, otp);
-        if (!emailResult.success) {
-            return res.status(500).json({ message: "Error sending OTP", error: emailResult.error });
-        }
-
-        console.log(`OTP for ${email}: ${otp}`);
+        const emailResult = await sendEmail(mailOptions);
 
         res.status(200).json({ 
-            message: "User created successfully. OTP sent to email."
+            message: "User created successfully and email sent successfully", emailResult,
+            token 
         });
 
     } catch (error) {
         res.status(500).json({ message: "Error creating User", error });
     }
 });
-
-// Verify OTP
-router.post("/users/verify-otp", async (req, res) => {
+router.post('/users/verify-otp',async(req,res)=>{
+    const{token,userOtp}=req.body;
     try {
-        const { email, otp } = req.body;
-
-        // Check if email and OTP are provided
-        if (!email || !otp) {
-            return res.status(400).json({ message: "Email and OTP are required" });
-        }
-
-        // Find OTP record for email
-        const otpRecord = await Otp.findOne({ email, otp });
-
-        // Check if OTP record exists and OTP is valid
-        if (!otpRecord) {
-            return res.status(400).json({ message: "Invalid OTP" });
-        }
-
-        // Check if OTP is expired
-        if (otpRecord.otpExpiry < Date.now()) {
-            return res.status(400).json({ message: "OTP has expired" });
-        }
-
-        // Delete OTP Record
-        await Otp.deleteOne({ _id: otpRecord._id });
-
-        // Generate JWT Token
-        const token = jwt.sign(
-            { email },
-            process.env.JWT_SECRET,
-            { expiresIn: '1h' }
-        );
-
-        res.status(200).json({ 
-            message: "OTP verified successfully. User is now verified.", 
-            token 
-        });
-
+         const decoded = jwt.verify(token,process.env.JWT_SECRET);
+         if(decoded.otp=== userOtp){
+            // ye line tab add karni hai jab aap ye chahte hai ki jab tak otp verify na ho tab tak login route access na ho 
+            await User.updateOne({ email: decoded.email }, { isEmailVerified: true });
+            res.status(200).json({message:"OTP Verified Successfully"});
+         }else{
+            res.status(400).json({message:"Invalid OTP , please try again."})
+         }
     } catch (error) {
-        res.status(500).json({ message: "Error verifying OTP", error });
+        return res.status(500).json({message:"Otp verification Failed or Otp has expired"})
     }
-});
+})
 router.post("/users/login", async (req, res) => {
     try {
         const { email, password } = req.body;
