@@ -4,9 +4,12 @@ const { sendEmail } = require("../config/emailConfig");
 
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
-const {sendEmail2} = require
+const sendEmail = require('../utils/sendEmail')
 const router = express.Router(); // Method for routing
 
+const generateOTP = () => {
+    return crypto.randomInt(100000, 999999).toString();
+};
 // Create a router for POST
 router.post("/users", async (req, res) => {
     try {
@@ -55,57 +58,48 @@ router.post("/users", async (req, res) => {
         res.status(500).json({ message: "Error creating User", error });
     }
 });
-router.post("/users/Verfiy_Otp", async (req, res) => {
+router.post("/verify-otp", async (req, res) => {
     try {
-        const { name, email, password, dob, phone } = req.body;
-        
-        // Check if all fields are filled
-        if (!name || !email || !password || !dob || !phone) {
-            return res.status(400).json({ message: "Sabhi fields required hain" });
-        }
-        
-        // Check if user already exists
-        const existingUser = await User.findOne({ email });
-        if (existingUser) {
-            return res.status(400).json({ message: "User already exists" });
+        const { email, otp } = req.body;
 
+        // Check if email and OTP are provided
+        if (!email || !otp) {
+            return res.status(400).json({ message: "Email and OTP are required" });
         }
-        const otp = generateOTP();
-        console.log(otp);
-        
-        const otpToken=jwt.sign({email,otp},
-            process.env.JWT_SECRET,{expiresIn:"10m"});
-            console.log(otpToken);
-          await sendEmail2(email,otp);
 
-        // Create a new user
-        const newUser = new User({ name, email, password, dob, phone });
-        await newUser.save();
+        // Find user with matching email and OTP
+        const user = await User.findOne({ email, otp });
+
+        // Check if user exists and OTP is valid
+        if (!user) {
+            return res.status(400).json({ message: "Invalid OTP" });
+        }
+
+        // Check if OTP is expired
+        if (user.otpExpiry < Date.now()) {
+            return res.status(400).json({ message: "OTP has expired" });
+        }
+
+        // Update user status to verified and remove OTP
+        user.isVerified = true;
+        user.otp = undefined;
+        user.otpExpiry = undefined;
+        await user.save();
 
         // Generate JWT Token
         const token = jwt.sign(
-            { userId: newUser._id },
+            { userId: user._id },
             process.env.JWT_SECRET,
             { expiresIn: '1h' }
         );
 
-        // Email Options
-        const mailOptions = {
-            from: process.env.EMAIL,
-            to: email,
-            subject: "Welcome to our e-commerce website",
-            text: `Hello ${name}, thank you for registering in our app. Welcome to our platform. Hope you will like our services.`,
-        };
-
-        const emailResult = await sendEmail(mailOptions);
-
         res.status(200).json({ 
-            message: "User created successfully and email sent successfully", 
+            message: "OTP verified successfully. User is now verified.", 
             token 
         });
 
     } catch (error) {
-        res.status(500).json({ message: "Error creating User", error });
+        res.status(500).json({ message: "Error verifying OTP", error });
     }
 });
 router.post("/users/login", async (req, res) => {
