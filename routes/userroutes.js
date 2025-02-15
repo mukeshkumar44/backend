@@ -1,8 +1,10 @@
 const express = require("express");
 const User = require("../models/user");
 const { sendEmail } = require("../config/emailConfig");
+
 const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
+const {sendEmail2} = require
 const router = express.Router(); // Method for routing
 
 // Create a router for POST
@@ -19,7 +21,15 @@ router.post("/users", async (req, res) => {
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: "User already exists" });
+
         }
+        const otp = generateOTP();
+        console.log(otp);
+        
+        const otpToken=jwt.sign({email,otp},
+            process.env.JWT_SECRET,{expiresIn:"10m"});
+            console.log(otpToken);
+          await sendEmail2(email,otp);
 
         // Create a new user
         const newUser = new User({ name, email, password, dob, phone });
