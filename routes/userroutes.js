@@ -1,15 +1,15 @@
 const express = require("express");
 const User = require("../models/user");
-const { sendEmail } = require("../config/emailConfig");
+const { sendEmail2 } = require("../config/emailConfig");
 
-const bcrypt = require("bcrypt");
 const jwt = require("jsonwebtoken");
 const router = express.Router(); 
 function generateOTP() {
-    const otp = crypto.randomInt(100000, 999999); 
+    const otp = crypto.randomInt(100000, 999999);
     return otp.toString();
 }
-const otp = generateOTP();
+
+// User Registration with OTP
 router.post("/users", async (req, res) => {
     try {
         const { name, email, password, dob, phone } = req.body;
@@ -21,66 +21,71 @@ router.post("/users", async (req, res) => {
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: "User already exists" });
-
         }
+
         const otp = generateOTP();
-        console.log(otp);
+        console.log(`Generated OTP: ${otp}`);
 
         const otpToken = jwt.sign({ email, otp },
             process.env.JWT_SECRET, { expiresIn: "10m" });
-        console.log(otpToken);
-        await sendEmail(email, otp);
 
-        // Create a new user
-        const newUser = new User({ name, email, password, dob, phone });
+        await sendEmail2(email, otp);   // Using sendEmail2
+
+        // Create a new user with isEmailVerified = false
+        const newUser = new User({ 
+            name, 
+            email, 
+            password, 
+            dob, 
+            phone,
+            isEmailVerified: false 
+        });
         await newUser.save();
 
-        // Generate JWT Token
+        // JWT Token for user login
         const token = jwt.sign(
             { userId: newUser._id },
             process.env.JWT_SECRET,
             { expiresIn: '1h' }
         );
 
-        // Email Options
-        const mailOptions = {
-            from: process.env.EMAIL,
-            to: email,
-            subject: "Welcome to our e-commerce website",
-            text: `Hello ${name}, thank you for registering in our app. Welcome to our platform. Hope you will like our services.`,
-        };
-
-        const emailResult = await sendEmail(mailOptions);
-
         res.status(200).json({
-            message: "User created successfully and email sent successfully", emailResult,
+            message: "User created successfully. OTP sent to email.",
+            otpToken,   // Return OTP Token for verification
             token
         });
 
     } catch (error) {
-        res.status(500).json({ message: "Error creating User", error });
+        console.error("Error creating User:", error.message);
+        res.status(500).json({ message: "Error creating User", error: error.message });
     }
 });
+
+// Verify OTP Route
 router.post('/users/verify-otp', async (req, res) => {
-    const { token, userOtp } = req.body;
+    const { otpToken, userOtp } = req.body;
     try {
-        const decoded = jwt.verify(token, process.env.JWT_SECRET);
-        if (!decoded || decoded.otp == userOtp) {
+        const decoded = jwt.verify(otpToken, process.env.JWT_SECRET);
+
+        if (!decoded || decoded.otp !== userOtp) {
             return res.status(400).json({ message: "Invalid OTP" });
-
-
         }
+
         const email = decoded.email;
         const user = await User.findOne({ email });
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+
         user.isEmailVerified = true;
         await user.save();
-        return res.status(200).json({ message: "Email verified successfully",user });
+        return res.status(200).json({ message: "Email verified successfully", user });
 
-        
     } catch (error) {
-        return res.status(500).json({ message: "Otp verification Failed or Otp has expired" ,error});
+        console.error("OTP Verification Error:", error.message);
+        return res.status(500).json({ message: "OTP verification failed or OTP has expired", error: error.message });
     }
-})
+});
 router.post("/users/login", async (req, res) => {
     try {
         const { email, password } = req.body;
