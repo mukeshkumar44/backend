@@ -1,5 +1,6 @@
 const express = require('express');
 const Seller = require('../models/seller');
+require('dotenv').config();
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt'); // Fixed spelling from becrypt to bcrypt
 const {generateOTP,sendEmail2}=require("../utils/sendOTP");

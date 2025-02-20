@@ -1,15 +1,13 @@
 const express = require("express");
 const User = require("../models/user");
-const { sendEmail2 } = require("../config/emailConfig");
-
+const { sendEmail } = require("../config/emailConfig");
 const jwt = require("jsonwebtoken");
+const crypto = require('crypto');
 const router = express.Router(); 
 function generateOTP() {
     const otp = crypto.randomInt(100000, 999999);
     return otp.toString();
 }
-
-// User Registration with OTP
 router.post("/users", async (req, res) => {
     try {
         const { name, email, password, dob, phone } = req.body;
@@ -17,19 +15,16 @@ router.post("/users", async (req, res) => {
         if (!name || !email || !password || !dob || !phone) {
             return res.status(400).json({ message: "Sabhi fields required hain" });
         }
-
         const existingUser = await User.findOne({ email });
         if (existingUser) {
             return res.status(400).json({ message: "User already exists" });
         }
-
         const otp = generateOTP();
         console.log(`Generated OTP: ${otp}`);
 
         const otpToken = jwt.sign({ email, otp },
             process.env.JWT_SECRET, { expiresIn: "10m" });
-
-        await sendEmail2(email, otp);   // Using sendEmail2
+        await sendEmail(email, otp);   // Using sendEmail2
 
         // Create a new user with isEmailVerified = false
         const newUser = new User({ 
@@ -42,7 +37,7 @@ router.post("/users", async (req, res) => {
         });
         await newUser.save();
 
-        // JWT Token for user login
+        
         const token = jwt.sign(
             { userId: newUser._id },
             process.env.JWT_SECRET,
@@ -51,7 +46,7 @@ router.post("/users", async (req, res) => {
 
         res.status(200).json({
             message: "User created successfully. OTP sent to email.",
-            otpToken,   // Return OTP Token for verification
+            otpToken,  
             token
         });
 
@@ -62,8 +57,13 @@ router.post("/users", async (req, res) => {
 });
 
 // Verify OTP Route
+// Verify OTP Route
 router.post('/users/verify-otp', async (req, res) => {
     const { otpToken, userOtp } = req.body;
+    if (!otpToken || !userOtp) {
+        return res.status(400).json({ message: "OTP Token and OTP are required" });
+    }
+
     try {
         const decoded = jwt.verify(otpToken, process.env.JWT_SECRET);
 
@@ -86,6 +86,7 @@ router.post('/users/verify-otp', async (req, res) => {
         return res.status(500).json({ message: "OTP verification failed or OTP has expired", error: error.message });
     }
 });
+
 router.post("/users/login", async (req, res) => {
     try {
         const { email, password } = req.body;

@@ -6,7 +6,8 @@ const routes=require("./routes/userroutes");
 const sellerroutes=require("./routes/sellerroutes");
 const productroutes=require("./routes/productroutes");
 const orderroutes=require("./routes/orderroutes");
-const loginroutes=require("./routes/loginroutes");
+const paymentroutes= require("./routes/paymentroutes")
+// const loginroutes=require("./routes/loginroutes");
 const cors = require("cors");
 const express = require("express");
 //reference of express
@@ -22,6 +23,7 @@ app.get("/", (req, res) => {
 app.use("/api",routes,);
 app.use("/api",sellerroutes,);
 app.use("/api",orderroutes,);
+app.use("/api",paymentroutes);
 // app.use("/api",loginroutes,);
 app.use("/api",productroutes,);
 app.listen(9001, () => {
