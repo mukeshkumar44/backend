@@ -5,7 +5,7 @@ const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt'); // Fixed spelling from becrypt to bcrypt
 const {generateOTP,sendEmail2}=require("../utils/sendOTP");
 const { sendEmail } = require("../config/emailConfig");
-// const authmiddleware = require('../Middleware/authmiddleware');
+const authmiddleware = require('../Middleware/authmiddleware');
 
 const router = express.Router();
 
